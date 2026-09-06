@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Free HTML to Figma</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div class="brand">Free HTML to Figma</div>
+        <p class="tagline">
+          Local only. Capture this browser window, then paste into Figma.
+        </p>
+        <p class="badge">Free · Open source · No upload · No account</p>
+      </header>
+
+      <section class="howto">
+        <div class="section-title">How to use</div>
+        <ol class="steps">
+          <li>Open the page you want (site or localhost).</li>
+          <li>Click <strong>Capture page</strong> (or select an element).</li>
+          <li>Wait for the on-page progress bar to finish.</li>
+          <li>In Figma, press <kbd>⌘V</kbd> / <kbd>Ctrl+V</kbd>.</li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Viewports</div>
+        <div id="viewport-chips" class="chips" role="group" aria-label="Viewport presets"></div>
+        <label class="field custom-width">
+          <span>Custom width (px)</span>
+          <input id="custom-width" type="number" min="320" max="3840" step="1" />
+        </label>
+      </section>
+
+      <section class="section">
+        <div class="section-title">Layout in Figma</div>
+        <div class="segmented" role="group" aria-label="Layout mode">
+          <button type="button" class="seg" data-layout="auto" id="layout-auto">
+            Auto Layout
+          </button>
+          <button type="button" class="seg" data-layout="absolute" id="layout-absolute">
+            Absolute
+          </button>
+        </div>
+        <p class="hint">
+          Auto Layout works best for flex/grid (including Tailwind). Use Absolute if layers look messy.
+        </p>
+      </section>
+
+      <section class="actions">
+        <button id="capture-page" class="btn primary" type="button">
+          Capture page
+        </button>
+        <button id="capture-multi" class="btn" type="button">
+          Multi-viewport paste
+        </button>
+        <button id="select-element" class="btn" type="button">
+          Select element
+        </button>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite">
+        Ready. Everything runs in your browser. Nothing is sent to a server.
+      </p>
+
+      <section class="links">
+        <a
+          id="github-link"
+          class="repo-link"
+          href="https://github.com/dynCode/HTML-to-FIGMA"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Open source on GitHub
+        </a>
+        <p class="repo-hint">
+          github.com/dynCode/HTML-to-FIGMA · stars, issues, and PRs welcome
+        </p>
+      </section>
+
+      <footer class="footer">
+        <span>Page: Alt+Shift+F</span>
+        <a
+          class="footer-repo"
+          href="https://github.com/dynCode/HTML-to-FIGMA"
+          target="_blank"
+          rel="noopener noreferrer"
+        >GitHub</a>
+        <span>Element: Alt+Shift+E</span>
+      </footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

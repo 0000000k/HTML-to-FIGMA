@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Free HTML to Figma",
+  "version": "0.2.1",
+  "description": "Free & local: export the page in your browser window, then paste editable layers into Figma. No account, no upload, no paid plugin.",
+  "homepage_url": "https://github.com/dynCode/HTML-to-FIGMA",
+  "permissions": ["activeTab", "scripting", "clipboardWrite", "storage", "windows"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "action": {
+    "default_title": "Free HTML to Figma - capture this page",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "capture-page": {
+      "suggested_key": {
+        "default": "Alt+Shift+F",
+        "mac": "Alt+Shift+F"
+      },
+      "description": "Capture the current browser page for Figma paste"
+    },
+    "select-element": {
+      "suggested_key": {
+        "default": "Alt+Shift+E",
+        "mac": "Alt+Shift+E"
+      },
+      "description": "Select one element to capture for Figma paste"
+    },
+    "capture-multi": {
+      "description": "Capture selected viewports into one Figma paste"
+    }
+  }
+}

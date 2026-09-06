@@ -1,0 +1,29 @@
+{
+  "name": "free-html-to-figma",
+  "version": "0.2.1",
+  "private": true,
+  "description": "Free & local Chrome extension: export the page in your browser window and paste editable layers into Figma",
+  "homepage": "https://github.com/dynCode/HTML-to-FIGMA",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dynCode/HTML-to-FIGMA.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dynCode/HTML-to-FIGMA/issues"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/build.mjs --watch",
+    "build": "tsc --noEmit && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@figit/dom-to-figma": "^0.2.4",
+    "@figit/fig-kiwi": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.24",
+    "esbuild": "^0.25.9",
+    "typescript": "^5.9.2"
+  }
+}
