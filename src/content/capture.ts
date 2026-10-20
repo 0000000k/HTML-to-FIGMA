@@ -9,8 +9,12 @@ import type {
   ResizeWindowResponse,
 } from "../shared/messages";
 import { resolveViewportWidths } from "../shared/settings";
-import { html2figmaClassify, looksLikeTailwind } from "./classify";
+import { html2figmaClassify } from "./classify";
 import { createHud } from "./hud";
+import { hideFloatingWidgets } from "./floating-widgets";
+import { detachHiddenDom } from "./hidden-dom";
+import { simplifyNeutralWrappers } from "./simplify-dom";
+import { detachNonRenderedSvg } from "./svg-cleanup";
 import { createExtensionImageLoader } from "./image-loader";
 import { pickElement, removePickerOverlay } from "./picker";
 import { prepareDom } from "./prepare-dom";
@@ -140,6 +144,7 @@ export async function runCapture(
   });
 
   let restoredWidth: number | null = null;
+  let restoreFloatingWidgets: (() => void) | null = null;
 
   try {
     const viewports =
@@ -194,6 +199,11 @@ export async function runCapture(
         await settleViewport(signal);
       }
 
+      if (settings.excludeFloatingWidgets && mode !== "element") {
+        restoreFloatingWidgets?.();
+        restoreFloatingWidgets = hideFloatingWidgets(element);
+      }
+
       await prepareDom({
         root: element,
         signal,
@@ -216,35 +226,50 @@ export async function runCapture(
         percent: basePercent + 20,
       });
 
-      const tw = looksLikeTailwind(element) ? "TW · " : "";
-      const frameName = `${tw}${vp.label} · ${document.title || location.hostname || "Page"}`.slice(
+      const frameName = `${vp.label} · ${document.title || location.hostname || "Page"}`.slice(
         0,
         80,
       );
 
-      const result = await convertRoot(
-        element,
-        frameName,
-        settings,
-        signal,
-        (done, total) => {
-          hud.setProgress({
-            stage: "assets",
-            message: `${vp.label}: assets ${done}/${total}`,
-            percent: basePercent + 20 + Math.min(25, (done / Math.max(total, 1)) * 25),
-            current: done,
-            total,
-          });
-        },
-      );
+      // Some sites keep large SVG logos and icon definitions hidden in the
+      // DOM. They must not be serialized as visible Figma layers.
+      const restoreHidden = detachHiddenDom(element);
+      let restoreSvg: () => void = () => {};
+      let restoreWrappers: () => void = () => {};
+      let named: ReturnType<typeof applyLayerNames>;
+      try {
+        restoreSvg = detachNonRenderedSvg(element);
+        if (settings.simplifyLayers) {
+          restoreWrappers = simplifyNeutralWrappers(element);
+        }
+        const result = await convertRoot(
+          element,
+          frameName,
+          settings,
+          signal,
+          (done, total) => {
+            hud.setProgress({
+              stage: "assets",
+              message: `${vp.label}: assets ${done}/${total}`,
+              percent: basePercent + 20 + Math.min(25, (done / Math.max(total, 1)) * 25),
+              current: done,
+              total,
+            });
+          },
+        );
 
-      hud.setProgress({
-        stage: "convert",
-        message: `${vp.label}: naming layers…`,
-        percent: basePercent + 50,
-      });
+        hud.setProgress({
+          stage: "convert",
+          message: `${vp.label}: naming layers…`,
+          percent: basePercent + 50,
+        });
 
-      const named = applyLayerNames(result, element);
+        named = applyLayerNames(result, element);
+      } finally {
+        restoreWrappers();
+        restoreSvg();
+        restoreHidden();
+      }
       captures.push({ document: named, x, name: frameName });
       x += measure(element).width + gap;
     }
@@ -279,6 +304,7 @@ export async function runCapture(
     }
     return { ok: false, message };
   } finally {
+    restoreFloatingWidgets?.();
     if (restoredWidth != null) {
       try {
         await resizeWindow(restoredWidth);

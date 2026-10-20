@@ -1,0 +1,24 @@
+name: Build Chrome extension
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - feat/exclude-floating-widgets
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Typecheck and build
+        run: npm run build

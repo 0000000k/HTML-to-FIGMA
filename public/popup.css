@@ -284,3 +284,16 @@ kbd {
 .footer-repo:hover {
   text-decoration: underline;
 }
+
+.toggle-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toggle-option input {
+  margin: 0;
+  accent-color: var(--accent);
+}

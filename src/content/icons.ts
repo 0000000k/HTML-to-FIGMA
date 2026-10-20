@@ -120,15 +120,9 @@ async function rasterizeSvgMarkup(
       '<svg xmlns="http://www.w3.org/2000/svg"',
     );
   }
-  // Force currentColor icons to a concrete fill when we know the CSS color.
-  if (color) {
-    markup = markup
-      .replaceAll("currentColor", color)
-      .replace(
-        /<svg\b([^>]*)>/i,
-        `<svg$1 fill="${color}" style="color:${color}">`,
-      );
-  }
+  // Replace inherited currentColor only. Never force a root fill: doing
+  // so paints paths that intentionally use fill=none or a distinct color.
+  if (color) markup = markup.replaceAll("currentColor", color);
 
   const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -174,7 +168,9 @@ async function fetchText(url: string): Promise<string | null> {
   }
 }
 
-/** Expand <use href="#id"> into cloned symbol content (same-document sprites). */
+/** Preserve the symbol viewBox while expanding same-document SVG sprites.
+ * A bare <g> drops the original viewBox and distorts the icon's geometry.
+ */
 export function expandSvgUseReferences(root: HTMLElement) {
   const uses = Array.from(root.querySelectorAll("use"));
   for (const use of uses) {
@@ -182,36 +178,67 @@ export function expandSvgUseReferences(root: HTMLElement) {
       use.getAttribute("href") || use.getAttribute("xlink:href") || "";
     if (!href.startsWith("#")) continue;
     const target = document.getElementById(href.slice(1));
-    if (!target) continue;
+    if (!target || !target.closest("svg")) continue;
 
-    const cloneSource =
-      target instanceof SVGSymbolElement || target.tagName.toLowerCase() === "symbol"
-        ? target
-        : target;
+    const isSymbol = target.tagName.toLowerCase() === "symbol";
+    const replacement = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      isSymbol ? "svg" : "g",
+    );
 
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    const x = Number.parseFloat(use.getAttribute("x") || "0") || 0;
-    const y = Number.parseFloat(use.getAttribute("y") || "0") || 0;
-    if (x || y) g.setAttribute("transform", `translate(${x} ${y})`);
-
-    for (const child of Array.from(cloneSource.childNodes)) {
-      g.appendChild(child.cloneNode(true));
+    if (isSymbol) {
+      for (const attr of ["viewBox", "preserveAspectRatio"]) {
+        const value = target.getAttribute(attr);
+        if (value) replacement.setAttribute(attr, value);
+      }
+      // The referenced symbol's viewBox must scale inside the use viewport.
+      replacement.setAttribute("width", use.getAttribute("width") || "100%");
+      replacement.setAttribute("height", use.getAttribute("height") || "100%");
+      if (use.hasAttribute("x")) replacement.setAttribute("x", use.getAttribute("x")!);
+      if (use.hasAttribute("y")) replacement.setAttribute("y", use.getAttribute("y")!);
+    } else {
+      const x = Number.parseFloat(use.getAttribute("x") || "0") || 0;
+      const y = Number.parseFloat(use.getAttribute("y") || "0") || 0;
+      if (x || y) replacement.setAttribute("transform", `translate(${x} ${y})`);
     }
 
-    // Copy presentation attrs from <use>
+    for (const child of Array.from(target.childNodes)) {
+      replacement.appendChild(child.cloneNode(true));
+    }
     for (const attr of Array.from(use.attributes)) {
-      if (attr.name === "href" || attr.name === "xlink:href" || attr.name === "x" || attr.name === "y") {
+      if (["href", "xlink:href", "x", "y", "width", "height"].includes(attr.name)) {
         continue;
       }
-      try {
-        g.setAttribute(attr.name, attr.value);
-      } catch {
-        // ignore
-      }
+      replacement.setAttribute(attr.name, attr.value);
     }
-
-    use.replaceWith(g);
+    use.replaceWith(replacement);
   }
+}
+
+/** Inline live computed SVG painting styles before serializing to a Blob.
+ * Otherwise icons styled with external CSS lose their strokes and fills.
+ */
+function cloneWithSvgPaintStyles(svg: SVGElement): SVGElement {
+  const clone = svg.cloneNode(true) as SVGElement;
+  const sourceElements: Element[] = [svg, ...Array.from(svg.querySelectorAll("*"))];
+  const cloneElements: Element[] = [clone, ...Array.from(clone.querySelectorAll("*"))];
+  const paintProps = [
+    "color", "fill", "fill-opacity", "fill-rule", "stroke",
+    "stroke-width", "stroke-opacity", "stroke-linecap",
+    "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray",
+    "stroke-dashoffset", "opacity", "visibility", "display",
+    "paint-order", "vector-effect",
+  ];
+  sourceElements.forEach((source, i) => {
+    const counterpart = cloneElements[i];
+    if (!(counterpart instanceof SVGElement)) return;
+    const computed = getComputedStyle(source);
+    for (const prop of paintProps) {
+      const value = computed.getPropertyValue(prop);
+      if (value) counterpart.style.setProperty(prop, value);
+    }
+  });
+  return clone;
 }
 
 function isComplexSvg(svg: SVGElement): boolean {
@@ -241,14 +268,14 @@ export async function rasterizeComplexSvgs(
     if (!tiny && !isComplexSvg(svg)) continue;
 
     try {
-      const clone = svg.cloneNode(true) as SVGElement;
+      const clone = cloneWithSvgPaintStyles(svg);
       if (!clone.getAttribute("xmlns")) {
         clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       }
       const cs = getComputedStyle(svg);
       const color = cs.color || "#000";
-      // Bake computed color onto root for currentColor icons.
-      clone.setAttribute("fill", clone.getAttribute("fill") || color);
+      // Paint attributes are baked per path, preserving fill=none and
+      // multicolor artwork rather than overwriting everything with one fill.
       clone.setAttribute("color", color);
       if (!clone.getAttribute("width")) {
         clone.setAttribute("width", String(Math.ceil(rect.width)));
@@ -297,42 +324,33 @@ export async function materializeCssMasks(
     const rect = el.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) continue;
 
-    const color = cs.color || cs.backgroundColor || "#000";
+    const color = cs.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+      cs.backgroundColor !== "transparent"
+      ? cs.backgroundColor
+      : cs.color || "#000";
     const url = urls[0];
     try {
-      let dataUrl: string | null = null;
-      if (url.startsWith("data:image/svg") || url.includes(".svg")) {
-        const markup = url.startsWith("data:")
-          ? await fetchText(url)
-          : await fetchText(url);
-        if (markup?.includes("<svg")) {
-          dataUrl = await rasterizeSvgMarkup(
-            markup,
-            rect.width,
-            rect.height,
-            color.startsWith("rgb") || color.startsWith("#") ? color : undefined,
-          );
-        }
-      }
-
-      if (!dataUrl) {
-        // Generic mask: draw mask alpha, fill with color
-        const image = await loadImage(
-          url.startsWith("data:") ? url : absolutize(url),
-        );
-        const scale = 2;
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.ceil(rect.width * scale);
-        canvas.height = Math.ceil(rect.height * scale);
-        const ctx = canvas.getContext("2d");
-        if (!ctx) continue;
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        ctx.globalCompositeOperation = "source-in";
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        dataUrl = canvas.toDataURL("image/png");
-      }
-
+      const markup = url.startsWith("data:") || url.includes(".svg")
+        ? await fetchText(url) : null;
+      // Draw the mask's alpha first, then tint with the CSS background color.
+      // A mask SVG's own fill is not the visible icon color.
+      const rawMask = markup?.includes("<svg")
+        ? await rasterizeSvgMarkup(markup, rect.width, rect.height)
+        : null;
+      const image = await loadImage(
+        rawMask || (url.startsWith("data:") ? url : absolutize(url)),
+      );
+      const scale = 3;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.ceil(rect.width * scale);
+      canvas.height = Math.ceil(rect.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) continue;
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "source-in";
+      ctx.fillStyle = color;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/png");
       if (!dataUrl) continue;
       replaceWithImg(el, dataUrl, rect, "Mask icon");
     } catch {
