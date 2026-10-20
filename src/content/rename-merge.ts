@@ -63,17 +63,39 @@ export function applyLayerNames(
   for (const entry of result.trace.entries) {
     const node = byGuid.get(guidKey(entry.guid));
     if (!node) continue;
+    const textMatch = /::text\[(\d+)\]$/.exec(entry.domPath);
     const path = entry.domPath.replace(/::text\[\d+\]$/, "");
     try {
-      const resolved =
-        path === ":scope" ? root : root.querySelector(path);
+      const resolved = path === ":scope" ? root : root.querySelector(path);
       if (resolved) {
-        node.name = layerNameFromElement(resolved);
-      } else if (entry.tag) {
+        if (node.type === "TEXT" || textMatch) {
+          // Trace entries for text fragments refer to their parent element.
+          // Prefer actual text content over its parent div/span CSS classes.
+          const textNodes = Array.from(resolved.childNodes).filter(
+            (child) => child.nodeType === Node.TEXT_NODE,
+          );
+          const index = textMatch ? Number(textMatch[1]) : 0;
+          const raw = textNodes[index]?.textContent?.trim() ||
+            (textNodes.length === 1 ? textNodes[0].textContent?.trim() : "") ||
+            "";
+          const text = raw.replace(/\s+/g, " ").trim();
+          if (text) node.name = `Text / ${text.slice(0, 52)}`;
+          else if (node.type === "TEXT") {
+            const meaningful = node.name?.trim();
+            if (!meaningful || /^(text|span|div)$/i.test(meaningful)) {
+              node.name = "Text";
+            }
+          } else {
+            node.name = layerNameFromElement(resolved);
+          }
+        } else {
+          node.name = layerNameFromElement(resolved);
+        }
+      } else if (entry.tag && node.type !== "TEXT") {
         node.name = entry.tag.toLowerCase();
       }
     } catch {
-      if (entry.tag) node.name = entry.tag.toLowerCase();
+      if (entry.tag && node.type !== "TEXT") node.name = entry.tag.toLowerCase();
     }
   }
 
