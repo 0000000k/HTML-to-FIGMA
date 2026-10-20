@@ -15,6 +15,7 @@ export type CaptureSettings = {
   viewportPresets: ViewportPresetId[];
   customWidth: number;
   imageConcurrency: number;
+  excludeFloatingWidgets: boolean;
 };
 
 export type CaptureRequest = {
