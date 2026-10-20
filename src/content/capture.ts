@@ -9,7 +9,7 @@ import type {
   ResizeWindowResponse,
 } from "../shared/messages";
 import { resolveViewportWidths } from "../shared/settings";
-import { html2figmaClassify, looksLikeTailwind } from "./classify";
+import { html2figmaClassify } from "./classify";
 import { createHud } from "./hud";
 import { hideFloatingWidgets } from "./floating-widgets";
 import { detachHiddenDom } from "./hidden-dom";
@@ -225,8 +225,7 @@ export async function runCapture(
         percent: basePercent + 20,
       });
 
-      const tw = looksLikeTailwind(element) ? "TW · " : "";
-      const frameName = `${tw}${vp.label} · ${document.title || location.hostname || "Page"}`.slice(
+      const frameName = `${vp.label} · ${document.title || location.hostname || "Page"}`.slice(
         0,
         80,
       );
