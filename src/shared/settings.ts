@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: CaptureSettings = {
   viewportPresets: ["current"],
   customWidth: 1200,
   imageConcurrency: 8,
+  excludeFloatingWidgets: false,
 };
 
 export async function loadSettings(): Promise<CaptureSettings> {
