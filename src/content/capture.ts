@@ -11,6 +11,7 @@ import type {
 import { resolveViewportWidths } from "../shared/settings";
 import { html2figmaClassify, looksLikeTailwind } from "./classify";
 import { createHud } from "./hud";
+import { hideFloatingWidgets } from "./floating-widgets";
 import { createExtensionImageLoader } from "./image-loader";
 import { pickElement, removePickerOverlay } from "./picker";
 import { prepareDom } from "./prepare-dom";
@@ -140,6 +141,7 @@ export async function runCapture(
   });
 
   let restoredWidth: number | null = null;
+  let restoreFloatingWidgets: (() => void) | null = null;
 
   try {
     const viewports =
@@ -192,6 +194,11 @@ export async function runCapture(
           restoredWidth = previous;
         }
         await settleViewport(signal);
+      }
+
+      if (settings.excludeFloatingWidgets && mode !== "element") {
+        restoreFloatingWidgets?.();
+        restoreFloatingWidgets = hideFloatingWidgets(element);
       }
 
       await prepareDom({
@@ -279,6 +286,7 @@ export async function runCapture(
     }
     return { ok: false, message };
   } finally {
+    restoreFloatingWidgets?.();
     if (restoredWidth != null) {
       try {
         await resizeWindow(restoredWidth);
