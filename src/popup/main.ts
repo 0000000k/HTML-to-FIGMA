@@ -34,6 +34,7 @@ const layoutAutoBtn = document.getElementById("layout-auto") as HTMLButtonElemen
 const layoutAbsoluteBtn = document.getElementById(
   "layout-absolute",
 ) as HTMLButtonElement;
+const excludeFloatingWidgetsInput = document.getElementById("exclude-floating-widgets") as HTMLInputElement;
 const githubLink = document.getElementById("github-link") as HTMLAnchorElement | null;
 const footerRepo = document.querySelector(
   ".footer-repo",
@@ -180,6 +181,11 @@ customWidthInput.addEventListener("change", () => {
   void persist();
 });
 
+excludeFloatingWidgetsInput.addEventListener("change", () => {
+  settings.excludeFloatingWidgets = excludeFloatingWidgetsInput.checked;
+  void persist();
+});
+
 capturePageBtn.addEventListener("click", () => {
   void requestCapture("page");
 });
@@ -197,4 +203,5 @@ void (async () => {
   settings = await loadSettings();
   renderChips();
   renderLayout();
+  excludeFloatingWidgetsInput.checked = settings.excludeFloatingWidgets;
 })();
