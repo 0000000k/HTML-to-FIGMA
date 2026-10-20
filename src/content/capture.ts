@@ -12,6 +12,7 @@ import { resolveViewportWidths } from "../shared/settings";
 import { html2figmaClassify, looksLikeTailwind } from "./classify";
 import { createHud } from "./hud";
 import { hideFloatingWidgets } from "./floating-widgets";
+import { detachHiddenDom } from "./hidden-dom";
 import { detachNonRenderedSvg } from "./svg-cleanup";
 import { createExtensionImageLoader } from "./image-loader";
 import { pickElement, removePickerOverlay } from "./picker";
@@ -232,9 +233,11 @@ export async function runCapture(
 
       // Some sites keep large SVG logos and icon definitions hidden in the
       // DOM. They must not be serialized as visible Figma layers.
-      const restoreSvg = detachNonRenderedSvg(element);
+      const restoreHidden = detachHiddenDom(element);
+      let restoreSvg: () => void = () => {};
       let named: ReturnType<typeof applyLayerNames>;
       try {
+        restoreSvg = detachNonRenderedSvg(element);
         const result = await convertRoot(
           element,
           frameName,
@@ -260,6 +263,7 @@ export async function runCapture(
         named = applyLayerNames(result, element);
       } finally {
         restoreSvg();
+        restoreHidden();
       }
       captures.push({ document: named, x, name: frameName });
       x += measure(element).width + gap;
