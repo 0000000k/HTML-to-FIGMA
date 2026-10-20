@@ -12,6 +12,7 @@ import { resolveViewportWidths } from "../shared/settings";
 import { html2figmaClassify, looksLikeTailwind } from "./classify";
 import { createHud } from "./hud";
 import { hideFloatingWidgets } from "./floating-widgets";
+import { detachNonRenderedSvg } from "./svg-cleanup";
 import { createExtensionImageLoader } from "./image-loader";
 import { pickElement, removePickerOverlay } from "./picker";
 import { prepareDom } from "./prepare-dom";
@@ -229,29 +230,37 @@ export async function runCapture(
         80,
       );
 
-      const result = await convertRoot(
-        element,
-        frameName,
-        settings,
-        signal,
-        (done, total) => {
-          hud.setProgress({
-            stage: "assets",
-            message: `${vp.label}: assets ${done}/${total}`,
-            percent: basePercent + 20 + Math.min(25, (done / Math.max(total, 1)) * 25),
-            current: done,
-            total,
-          });
-        },
-      );
+      // Some sites keep large SVG logos and icon definitions hidden in the
+      // DOM. They must not be serialized as visible Figma layers.
+      const restoreSvg = detachNonRenderedSvg(element);
+      let named: ReturnType<typeof applyLayerNames>;
+      try {
+        const result = await convertRoot(
+          element,
+          frameName,
+          settings,
+          signal,
+          (done, total) => {
+            hud.setProgress({
+              stage: "assets",
+              message: `${vp.label}: assets ${done}/${total}`,
+              percent: basePercent + 20 + Math.min(25, (done / Math.max(total, 1)) * 25),
+              current: done,
+              total,
+            });
+          },
+        );
 
-      hud.setProgress({
-        stage: "convert",
-        message: `${vp.label}: naming layers…`,
-        percent: basePercent + 50,
-      });
+        hud.setProgress({
+          stage: "convert",
+          message: `${vp.label}: naming layers…`,
+          percent: basePercent + 50,
+        });
 
-      const named = applyLayerNames(result, element);
+        named = applyLayerNames(result, element);
+      } finally {
+        restoreSvg();
+      }
       captures.push({ document: named, x, name: frameName });
       x += measure(element).width + gap;
     }
