@@ -16,6 +16,7 @@ export type CaptureSettings = {
   customWidth: number;
   imageConcurrency: number;
   excludeFloatingWidgets: boolean;
+  simplifyLayers: boolean;
 };
 
 export type CaptureRequest = {
