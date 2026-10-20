@@ -35,6 +35,7 @@ const layoutAbsoluteBtn = document.getElementById(
   "layout-absolute",
 ) as HTMLButtonElement;
 const excludeFloatingWidgetsInput = document.getElementById("exclude-floating-widgets") as HTMLInputElement;
+const simplifyLayersInput = document.getElementById("simplify-layers") as HTMLInputElement;
 const githubLink = document.getElementById("github-link") as HTMLAnchorElement | null;
 const footerRepo = document.querySelector(
   ".footer-repo",
@@ -186,6 +187,11 @@ excludeFloatingWidgetsInput.addEventListener("change", () => {
   void persist();
 });
 
+simplifyLayersInput.addEventListener("change", () => {
+  settings.simplifyLayers = simplifyLayersInput.checked;
+  void persist();
+});
+
 capturePageBtn.addEventListener("click", () => {
   void requestCapture("page");
 });
@@ -204,4 +210,5 @@ void (async () => {
   renderChips();
   renderLayout();
   excludeFloatingWidgetsInput.checked = settings.excludeFloatingWidgets;
+  simplifyLayersInput.checked = settings.simplifyLayers;
 })();
