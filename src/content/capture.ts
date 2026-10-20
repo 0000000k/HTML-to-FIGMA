@@ -13,6 +13,7 @@ import { html2figmaClassify } from "./classify";
 import { createHud } from "./hud";
 import { hideFloatingWidgets } from "./floating-widgets";
 import { detachHiddenDom } from "./hidden-dom";
+import { simplifyNeutralWrappers } from "./simplify-dom";
 import { detachNonRenderedSvg } from "./svg-cleanup";
 import { createExtensionImageLoader } from "./image-loader";
 import { pickElement, removePickerOverlay } from "./picker";
@@ -234,9 +235,13 @@ export async function runCapture(
       // DOM. They must not be serialized as visible Figma layers.
       const restoreHidden = detachHiddenDom(element);
       let restoreSvg: () => void = () => {};
+      let restoreWrappers: () => void = () => {};
       let named: ReturnType<typeof applyLayerNames>;
       try {
         restoreSvg = detachNonRenderedSvg(element);
+        if (settings.simplifyLayers) {
+          restoreWrappers = simplifyNeutralWrappers(element);
+        }
         const result = await convertRoot(
           element,
           frameName,
@@ -261,6 +266,7 @@ export async function runCapture(
 
         named = applyLayerNames(result, element);
       } finally {
+        restoreWrappers();
         restoreSvg();
         restoreHidden();
       }
